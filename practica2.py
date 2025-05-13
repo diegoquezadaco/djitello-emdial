@@ -164,8 +164,6 @@ try:
         cv2.putText(frame, f"Battery: {bat}%", (10, HEIGHT-10),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,255,0), 2)
 
-        # send control commands
-        drone.send_rc_control(lr_vel, fb_vel, ud_vel, yaw_vel)
 
         # display windows
         cv2.imshow('Tello', frame)
@@ -180,6 +178,37 @@ try:
         elif key == ord('t') and not flying and bat > 15:
             drone.takeoff()
             flying = True
+
+        # manual control
+        if flying:
+            if key == ord('w'):
+                fb_vel = 100
+            elif key == ord('s'):
+                fb_vel = -100
+            elif key == ord('a'):
+                lr_vel = -100
+            elif key == ord('d'):
+                lr_vel = 100
+            elif key == ord('r'):
+                if drone.get_height() > 300:
+                    cv2.putText(frame, "Height Exceeded", (10, 120), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                    ud_vel = 0
+                else:
+                    ud_vel = 60
+            elif key == ord('f'):
+                ud_vel = -60
+            elif key == ord('q'):
+                yaw_vel = 100
+            elif key == ord('e'):
+                yaw_vel = -100
+            else:
+                fb_vel = 0
+                lr_vel = 0
+                ud_vel = 0
+                yaw_vel = 0
+            
+        drone.send_rc_control(lr_vel, fb_vel, ud_vel, yaw_vel)
 
 finally:
     if flying:
