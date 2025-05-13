@@ -51,6 +51,7 @@ for name, val, mx in [
 
 drone.takeoff()
 flying = True
+mode = False  # manual control mode, true is manual mode.
 
 try:
     while True:
@@ -167,9 +168,6 @@ try:
         cv2.putText(frame, f"Battery: {bat}%", (10, HEIGHT-10),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,255,0), 2)
 
-        # send commands
-        drone.send_rc_control(lr_vel, fb_vel, ud_vel, yaw_vel)
-
         # display
         cv2.imshow('Tello', frame)
         cv2.imshow('Mask', mask)
@@ -181,6 +179,46 @@ try:
             drone.land(); flying = False
         elif key == ord('t') and not flying and bat > 15:
             drone.takeoff(); flying = True
+        elif key == ord('m'):
+            mode = not mode
+            if mode:
+                cv2.putText(frame, "Manual Control", (10, 150), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            else:
+                cv2.putText(frame, "Auto Control", (10, 150), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+
+        # manual control
+        if flying and mode:
+            if key == ord('w'):
+                fb_vel = 100
+            elif key == ord('s'):
+                fb_vel = -100
+            elif key == ord('a'):
+                lr_vel = -100
+            elif key == ord('d'):
+                lr_vel = 100
+            elif key == ord('r'):
+                if drone.get_height() > 300:
+                    cv2.putText(frame, "Height Exceeded", (10, 120), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                    ud_vel = 0
+                else:
+                    ud_vel = 60
+            elif key == ord('f'):
+                ud_vel = -60
+            elif key == ord('q'):
+                yaw_vel = 100
+            elif key == ord('e'):
+                yaw_vel = -100
+            else:
+                fb_vel = 0
+                lr_vel = 0
+                ud_vel = 0
+                yaw_vel = 0
+            
+        drone.send_rc_control(lr_vel, fb_vel, ud_vel, yaw_vel)
+        
 
 finally:
     if flying:

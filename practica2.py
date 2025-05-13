@@ -47,6 +47,7 @@ cv2.createTrackbar('V Max','Trackbars',V_MAX,255,nothing)
 
 drone.takeoff()
 flying = True
+mode = False  # manual control mode, true is manual mode.
 
 try:
     while True:
@@ -178,9 +179,17 @@ try:
         elif key == ord('t') and not flying and bat > 15:
             drone.takeoff()
             flying = True
+        elif key == ord('m'):
+            mode = not mode
+            if mode:
+                cv2.putText(frame, "Manual Control", (10, 150), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            else:
+                cv2.putText(frame, "Auto Control", (10, 150), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
         # manual control
-        if flying:
+        if flying and mode:
             if key == ord('w'):
                 fb_vel = 100
             elif key == ord('s'):
