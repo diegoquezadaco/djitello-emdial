@@ -5,7 +5,7 @@ import numpy as np
 
 # --- CONFIG ---
 WIDTH, HEIGHT = 650, 500
-AREA_MIN     = 0.05 * (WIDTH * HEIGHT)  # minimum area to consider “in frame”
+AREA_MIN     = 0.005 * (WIDTH * HEIGHT)  # minimum area to consider “in frame”
 DESIRED_AREA = AREA_MIN                 # target area
 
 THRESHOLD_X  = int(0.15 * WIDTH)        # dead-zone half-width
