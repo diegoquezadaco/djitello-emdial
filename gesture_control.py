@@ -45,8 +45,9 @@ drone.streamon()
 time.sleep(3)
 
 global flying
-flying = False  # Estado de vuelo del dron
-mode = False  # manual control mode, true is manual mode.
+#flying = False  # Estado de vuelo del dron
+global mode 
+#mode = False  # manual control mode, true is manual mode.
 
 
 def clean_exit():
@@ -64,6 +65,8 @@ def clean_exit():
 def control():
     
     flying = False
+    mode = False  # manual control mode, true is manual mode.
+
 
     fb_vel = 0
     lr_vel = 0
@@ -83,6 +86,11 @@ def control():
         frame = cv2.flip(frame, 1)
         h, w, _ = frame.shape
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        square_size = max(frame.shape[:2])
+        square_frame = cv2.resize(rgb, (square_size, square_size))
+        result = hands.process(square_frame)
+
 
         result = hands.process(rgb)
         label = "No se detecta mano"
@@ -218,7 +226,7 @@ def control():
         elif key == ord('l') and flying:
             drone.land()
             flying = False
-        elif key == ord('t') and not flying and bat > 15:
+        elif key == ord('t') and not flying and drone.get_battery() > 15:
             drone.takeoff()
             flying = True
         elif key == ord('m'):
