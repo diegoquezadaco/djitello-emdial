@@ -60,9 +60,30 @@ while True:
         handedness = result.multi_handedness[0]
 
         landmarks = hand_landmarks.landmark
-
-        # Detectar el indice apuntando a la derecha, y los demas dedos cerrados
-        if landmarks[thumb_tip].y < landmarks[thumb_ip].y and \
+        if landmarks[middle_tip].y < landmarks[middle_mcp].y and landmarks[ring_tip].y < landmarks[ring_mcp].y and landmarks[pinky_tip].y < landmarks[pinky_mcp].y and landmarks[thumb_tip].y < landmarks[thumb_mcp].y and landmarks[index_tip].y < landmarks[index_mcp].y:
+            label = "Takeoff"
+    
+        elif landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y > landmarks[pinky_mcp].y and landmarks[index_tip].y > landmarks[index_mcp].y:
+            label = "Land"
+        elif landmarks[pinky_tip].y < landmarks[pinky_mcp].y and landmarks[thumb_tip].x > landmarks[thumb_mcp].x and landmarks[index_tip].y > landmarks[index_mcp].y and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y:
+            label = "Up"
+            cmd = 2
+        elif landmarks[pinky_tip].y > landmarks[pinky_mcp].y and landmarks[thumb_tip].y > landmarks[thumb_mcp].y and landmarks[index_tip].y > landmarks[wrist].y and landmarks[middle_tip].y > landmarks[wrist].y and landmarks[ring_tip].y > landmarks[wrist].y:
+            label = "Down"
+            cmd = 3
+        elif landmarks[thumb_tip].y < landmarks[thumb_mcp].y and landmarks[index_tip].y < landmarks[index_mcp].y and landmarks[thumb_tip].x < landmarks[pinky_mcp].x and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y > landmarks[pinky_mcp].y:
+            label = "Right"
+            cmd = 4
+        elif landmarks[thumb_tip].y < landmarks[thumb_mcp].y and landmarks[index_tip].y < landmarks[index_mcp].y and landmarks[thumb_tip].x > landmarks[pinky_mcp].x and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y > landmarks[pinky_mcp].y:
+            label = "Left"
+            cmd = 5
+        elif landmarks[thumb_tip].y < landmarks[thumb_mcp].y and landmarks[index_tip].y < landmarks[index_mcp].y and landmarks[thumb_tip].x < landmarks[pinky_mcp].x and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y < landmarks[pinky_mcp].y:
+            label = "Front"
+            cmd = 6
+        elif landmarks[thumb_tip].y < landmarks[thumb_mcp].y and landmarks[index_tip].y < landmarks[index_mcp].y and landmarks[thumb_tip].x > landmarks[pinky_mcp].x and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y < landmarks[pinky_mcp].y:
+            label = "Back"
+            cmd = 7
+        elif landmarks[thumb_tip].y < landmarks[thumb_ip].y and \
                 landmarks[thumb_ip].y < landmarks[thumb_mcp].y and \
                 landmarks[index_tip].x > landmarks[index_pip].x and \
                 landmarks[middle_tip].x > landmarks[middle_pip].x and \
@@ -71,7 +92,7 @@ while True:
                 landmarks[pinky_dip].x < landmarks[pinky_pip].x and \
                 landmarks[pinky_pip].x < landmarks[pinky_mcp].x:
             label = "Chill"
-        
+    
         elif landmarks[thumb_tip].y < landmarks[thumb_ip].y and \
                 landmarks[thumb_ip].y < landmarks[thumb_mcp].y and \
                 landmarks[index_tip].x < landmarks[index_pip].x and \
@@ -91,7 +112,7 @@ while True:
             print("index tip", landmarks[index_tip].x, "index mcp", landmarks[index_mcp].x)
             distance = compute_distance(landmarks[index_tip], landmarks[thumb_tip])
             cv2.line(frame, (int(landmarks[index_tip].x * w), int(landmarks[index_tip].y * h)),
-                     (int(landmarks[thumb_tip].x * w), int(landmarks[thumb_tip].y * h)), (0, 255, 0), 2)
+                    (int(landmarks[thumb_tip].x * w), int(landmarks[thumb_tip].y * h)), (0, 255, 0), 2)
             
             #label = (f'Distance: {distance:.4} - Index pointing up')
 
@@ -103,6 +124,7 @@ while True:
             
         else:
             label = "Otro gesto"
+            print(f"Detected command: {label}")
 
         # Dibujar puntos de la mano
         mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
