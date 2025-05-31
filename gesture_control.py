@@ -45,6 +45,9 @@ drone.streamon()
 time.sleep(3)
 
 global flying
+flying = False  # Estado de vuelo del dron
+mode = False  # manual control mode, true is manual mode.
+
 
 def clean_exit():
     
@@ -209,51 +212,53 @@ def control():
         #     break
 
 
-        
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('q'):
+            break
+        elif key == ord('l') and flying:
+            drone.land()
+            flying = False
+        elif key == ord('t') and not flying and bat > 15:
+            drone.takeoff()
+            flying = True
+        elif key == ord('m'):
+            mode = not mode
+            if mode:
+                cv2.putText(frame, "Manual Control", (10, 150), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            else:
+                cv2.putText(frame, "Auto Control", (10, 150), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
-
-        # if key == ord('t'):
-        #     if flying:
-        #         pass
-        #     else:
-        #         if drone.get_battery() <= 15 and not flying:
-        #             pass
-        #         else:
-        #             drone.takeoff()
-        #             flying = True
-        
-        # if key == ord('l'):
-        #     if flying:
-        #         drone.land()
-        #         flying = False
-        #     else:
-        #         pass
-        
-        # if flying:
-        #     if key == ord('w'):
-        #         fb_vel = 100
-        #     elif key == ord('s'):
-        #         fb_vel = -100
-        #     elif key == ord('a'):
-        #         lr_vel = -100
-        #     elif key == ord('d'):
-        #         lr_vel = 100
-        #     elif key == ord('r'):
-        #         if drone.get_height() > 300:
-        #             cv2.putText(frame, "Height Exceeded", (10, 120), 
-        #                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-        #             ud_vel = 0
-        #         else:
-        #             ud_vel = 60
-        #     elif key == ord('f'):
-        #         ud_vel = -60
-        #     elif key == ord('q'):
-        #         yaw_vel = 100
-        #     elif key == ord('e'):
-        #         yaw_vel = -100
-
+        # manual control
+        if flying and mode:
+            if key == ord('w'):
+                fb_vel = 100
+            elif key == ord('s'):
+                fb_vel = -100
+            elif key == ord('a'):
+                lr_vel = -100
+            elif key == ord('d'):
+                lr_vel = 100
+            elif key == ord('r'):
+                if drone.get_height() > 300:
+                    cv2.putText(frame, "Height Exceeded", (10, 120), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                    ud_vel = 0
+                else:
+                    ud_vel = 60
+            elif key == ord('f'):
+                ud_vel = -60
+            elif key == ord('q'):
+                yaw_vel = 100
+            elif key == ord('e'):
+                yaw_vel = -100
+            else:
+                fb_vel = 0
+                lr_vel = 0
+                ud_vel = 0
+                yaw_vel = 0
             
-
         drone.send_rc_control(lr_vel, fb_vel, ud_vel, yaw_vel)
 
 
