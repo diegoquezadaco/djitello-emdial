@@ -92,49 +92,97 @@ try:
         ud_vel  = 0   # up/down
         yaw_vel = 0   # rotation
 
-        if area > AREA_MIN:
-            x, y, w, h = cv2.boundingRect(c)
-            cx, cy = x + w//2, y + h//2
+        if result.multi_hand_landmarks and result.multi_handedness:
+            hand_landmarks = result.multi_hand_landmarks[0]
+            handedness = result.multi_handedness[0]
 
-            # draw bounding box + center dot
-            cv2.rectangle(frame, (x,y), (x+w,y+h), (0,255,0), 2)
-            cv2.circle(frame, (cx,cy), 5, (0,0,255), -1)
+            landmarks = hand_landmarks.landmark
+            if landmarks[middle_tip].y < landmarks[middle_mcp].y and landmarks[ring_tip].y < landmarks[ring_mcp].y and landmarks[pinky_tip].y < landmarks[pinky_mcp].y and landmarks[thumb_tip].y < landmarks[thumb_mcp].y and landmarks[index_tip].y < landmarks[index_mcp].y:
+                label = "Takeoff"
+        
+                if flying:
+                    pass
+                else:
+                    if drone.get_battery() <= 15 and not flying:
+                        pass
+                    else:
+                        drone.takeoff()
+                        flying = True
+            elif landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y > landmarks[pinky_mcp].y and landmarks[index_tip].y > landmarks[index_mcp].y:
+                label = "Land"
+                if flying:
+                    drone.land()
+                    flying = False
+                else:
+                    pass
+            elif landmarks[pinky_tip].y < landmarks[pinky_mcp].y and landmarks[thumb_tip].x > landmarks[thumb_mcp].x and landmarks[index_tip].y > landmarks[index_mcp].y and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y:
+                label = "Up"
+                if flying:
+                    ud_vel = 30
+                
+            elif landmarks[pinky_tip].y > landmarks[pinky_mcp].y and landmarks[thumb_tip].y > landmarks[thumb_mcp].y and landmarks[index_tip].y > landmarks[wrist].y and landmarks[middle_tip].y > landmarks[wrist].y and landmarks[ring_tip].y > landmarks[wrist].y:
+                label = "Down"
+                if flying:
+                    ud_vel = -30
+                
+            elif landmarks[thumb_tip].y < landmarks[thumb_mcp].y and landmarks[index_tip].y < landmarks[index_mcp].y and landmarks[thumb_tip].x < landmarks[pinky_mcp].x and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y > landmarks[pinky_mcp].y:
+                label = "Right"
+                if flying:
+                    lr_vel = 50
+                
+            elif landmarks[thumb_tip].y < landmarks[thumb_mcp].y and landmarks[index_tip].y < landmarks[index_mcp].y and landmarks[thumb_tip].x > landmarks[pinky_mcp].x and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y > landmarks[pinky_mcp].y:
+                label = "Left"
+                if flying:
+                    lr_vel = -50
+                
+            elif landmarks[thumb_tip].y < landmarks[thumb_mcp].y and landmarks[index_tip].y < landmarks[index_mcp].y and landmarks[thumb_tip].x < landmarks[pinky_mcp].x and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y < landmarks[pinky_mcp].y:
+                label = "Front"
+                if flying:
+                    fb_vel = 50
+                
+            elif landmarks[thumb_tip].y < landmarks[thumb_mcp].y and landmarks[index_tip].y < landmarks[index_mcp].y and landmarks[thumb_tip].x > landmarks[pinky_mcp].x and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y < landmarks[pinky_mcp].y:
+                label = "Back"
+                if flying:
+                    fb_vel = -50
+                
+            elif landmarks[thumb_tip].y < landmarks[thumb_ip].y and \
+                    landmarks[thumb_ip].y < landmarks[thumb_mcp].y and \
+                    landmarks[index_tip].x > landmarks[index_pip].x and \
+                    landmarks[middle_tip].x > landmarks[middle_pip].x and \
+                    landmarks[ring_tip].x > landmarks[ring_pip].x and \
+                    landmarks[pinky_tip].x < landmarks[pinky_dip].x and \
+                    landmarks[pinky_dip].x < landmarks[pinky_pip].x and \
+                    landmarks[pinky_pip].x < landmarks[pinky_mcp].x:
+                label = "Chill"
+                if flying:
+                    yaw_vel = 60
+        
+            elif landmarks[thumb_tip].y < landmarks[thumb_ip].y and \
+                    landmarks[thumb_ip].y < landmarks[thumb_mcp].y and \
+                    landmarks[index_tip].x < landmarks[index_pip].x and \
+                    landmarks[middle_tip].x < landmarks[middle_pip].x and \
+                    landmarks[ring_tip].x < landmarks[ring_pip].x and \
+                    landmarks[pinky_tip].x > landmarks[pinky_dip].x and \
+                    landmarks[pinky_dip].x > landmarks[pinky_pip].x and \
+                    landmarks[pinky_pip].x > landmarks[pinky_mcp].x:
+                label = "Chill Pal otro lado"
+                if flying:
+                    yaw_vel = -60
+                
+                #label = (f'Distance: {distance:.4} - Index pointing up')
 
-            # compute errors
-            err_x    = cx - WIDTH//2
-            err_y    = HEIGHT//2 - cy
-            err_area = DESIRED_AREA - (w*h)
+                
+            else:
+                label = "Otro gesto"
+                fb_vel = 0
+                lr_vel = 0
+                ud_vel = 0
+                yaw_vel = 0
+            
+            print(f"Detected command: {label}")
 
-            # YAW: flipped sign so +err_x → rotate right
-            if abs(err_x) > THRESHOLD_X:
-                yaw_vel = int(np.clip( Kp_yaw * err_x, -MAX_YAW, MAX_YAW))
-            # VERTICAL
-            if abs(err_y) > THRESHOLD_Y:
-                ud_vel = int(np.clip( Kp_v  * err_y, -MAX_V,   MAX_V  ))
-            # FORWARD/BACK
-            fb_vel = int(np.clip( Kp_fb * err_area, -MAX_FB, MAX_FB))
+        
 
-            # annotate on frame
-            if yaw_vel < 0:
-                cv2.putText(frame, 'Rotate →', (10,30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,0,0), 2)
-            elif yaw_vel > 0:
-                cv2.putText(frame, 'Rotate ←', (10,30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,0,0), 2)
-
-            if ud_vel > 0:
-                cv2.putText(frame, 'Up', (10,60),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,0,0), 2)
-            elif ud_vel < 0:
-                cv2.putText(frame, 'Down', (10,60),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,0,0), 2)
-
-            if fb_vel > 0:
-                cv2.putText(frame, 'Forward', (10,90),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,0,0), 2)
-            elif fb_vel < 0:
-                cv2.putText(frame, 'Backward', (10,90),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,0,0), 2)
 
         # draw dead-zone rectangle
         cv2.rectangle(frame,
