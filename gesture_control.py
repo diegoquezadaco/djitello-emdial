@@ -125,7 +125,6 @@ def control():
                         flying = True
             elif landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y > landmarks[pinky_mcp].y and landmarks[index_tip].y > landmarks[index_mcp].y:
                 label = "Land"
-                cmd = 1
                 if flying:
                     drone.land()
                     flying = False
@@ -133,22 +132,34 @@ def control():
                     pass
             elif landmarks[pinky_tip].y < landmarks[pinky_mcp].y and landmarks[thumb_tip].x > landmarks[thumb_mcp].x and landmarks[index_tip].y > landmarks[index_mcp].y and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y:
                 label = "Up"
-                cmd = 2
+                if flying:
+                    ud_vel = 30
+                
             elif landmarks[pinky_tip].y > landmarks[pinky_mcp].y and landmarks[thumb_tip].y > landmarks[thumb_mcp].y and landmarks[index_tip].y > landmarks[wrist].y and landmarks[middle_tip].y > landmarks[wrist].y and landmarks[ring_tip].y > landmarks[wrist].y:
                 label = "Down"
-                cmd = 3
+                if flying:
+                    ud_vel = -30
+                
             elif landmarks[thumb_tip].y < landmarks[thumb_mcp].y and landmarks[index_tip].y < landmarks[index_mcp].y and landmarks[thumb_tip].x < landmarks[pinky_mcp].x and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y > landmarks[pinky_mcp].y:
                 label = "Right"
-                cmd = 4
+                if flying:
+                    lr_vel = 50
+                
             elif landmarks[thumb_tip].y < landmarks[thumb_mcp].y and landmarks[index_tip].y < landmarks[index_mcp].y and landmarks[thumb_tip].x > landmarks[pinky_mcp].x and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y > landmarks[pinky_mcp].y:
                 label = "Left"
-                cmd = 5
+                if flying:
+                    lr_vel = -50
+                
             elif landmarks[thumb_tip].y < landmarks[thumb_mcp].y and landmarks[index_tip].y < landmarks[index_mcp].y and landmarks[thumb_tip].x < landmarks[pinky_mcp].x and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y < landmarks[pinky_mcp].y:
                 label = "Front"
-                cmd = 6
+                if flying:
+                    fb_vel = 50
+                
             elif landmarks[thumb_tip].y < landmarks[thumb_mcp].y and landmarks[index_tip].y < landmarks[index_mcp].y and landmarks[thumb_tip].x > landmarks[pinky_mcp].x and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y < landmarks[pinky_mcp].y:
                 label = "Back"
-                cmd = 7
+                if flying:
+                    fb_vel = -50
+                
             elif landmarks[thumb_tip].y < landmarks[thumb_ip].y and \
                     landmarks[thumb_ip].y < landmarks[thumb_mcp].y and \
                     landmarks[index_tip].x > landmarks[index_pip].x and \
@@ -158,6 +169,8 @@ def control():
                     landmarks[pinky_dip].x < landmarks[pinky_pip].x and \
                     landmarks[pinky_pip].x < landmarks[pinky_mcp].x:
                 label = "Chill"
+                if flying:
+                    yaw_vel = 60
         
             elif landmarks[thumb_tip].y < landmarks[thumb_ip].y and \
                     landmarks[thumb_ip].y < landmarks[thumb_mcp].y and \
@@ -168,90 +181,77 @@ def control():
                     landmarks[pinky_dip].x > landmarks[pinky_pip].x and \
                     landmarks[pinky_pip].x > landmarks[pinky_mcp].x:
                 label = "Chill Pal otro lado"
-
-            elif landmarks[thumb_tip].x < landmarks[thumb_ip].x and \
-                    landmarks[thumb_ip].x < landmarks[thumb_mcp].x and \
-                    landmarks[index_tip].y > landmarks[pinky_mcp].y and \
-                    landmarks[index_tip].x < landmarks[index_dip].x and \
-                    landmarks[index_dip].x < landmarks[index_pip].x and \
-                    landmarks[index_pip].x < landmarks[index_mcp].x: #and \
-                print("index tip", landmarks[index_tip].x, "index mcp", landmarks[index_mcp].x)
-                distance = compute_distance(landmarks[index_tip], landmarks[thumb_tip])
-                cv2.line(frame, (int(landmarks[index_tip].x * w), int(landmarks[index_tip].y * h)),
-                        (int(landmarks[thumb_tip].x * w), int(landmarks[thumb_tip].y * h)), (0, 255, 0), 2)
+                if flying:
+                    yaw_vel = -60
                 
                 #label = (f'Distance: {distance:.4} - Index pointing up')
 
-                cv2.putText(frame, f'Distance: {distance:.4}', (10, 80), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                if distance <= 0.2:  # Ajusta el umbral según sea necesario
-                    label = "Backward"
-                elif distance > 0.2:
-                    label = "Forward"
                 
             else:
                 label = "Otro gesto"
-                print(f"Detected command: {label}")
-
-        
-
-        '''if drone.get_height() > 300 and ud_vel > 0:
-            print("Altura máxima alcanzada. No se puede subir más.")
-            ud_vel = 0
-            drone.send_rc_control(0, 0, 0, 0)
-            drone.land()'''
-
-        if key == ord('p'):
-            clean_exit()
-            break
-
-
-        
-
-
-        if key == ord('t'):
-            if flying:
-                pass
-            else:
-                if drone.get_battery() <= 15 and not flying:
-                    pass
-                else:
-                    drone.takeoff()
-                    flying = True
-        
-        if key == ord('l'):
-            if flying:
-                drone.land()
-                flying = False
-            else:
-                pass
-        
-        if flying:
-            if key == ord('w'):
-                fb_vel = 100
-            elif key == ord('s'):
-                fb_vel = -100
-            elif key == ord('a'):
-                lr_vel = -100
-            elif key == ord('d'):
-                lr_vel = 100
-            elif key == ord('r'):
-                if drone.get_height() > 300:
-                    cv2.putText(frame, "Height Exceeded", (10, 120), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                    ud_vel = 0
-                else:
-                    ud_vel = 60
-            elif key == ord('f'):
-                ud_vel = -60
-            elif key == ord('q'):
-                yaw_vel = 100
-            elif key == ord('e'):
-                yaw_vel = -100
-            else:
                 fb_vel = 0
                 lr_vel = 0
                 ud_vel = 0
                 yaw_vel = 0
+            
+            print(f"Detected command: {label}")
+
+        
+
+        if drone.get_height() > 300 and ud_vel > 0:
+            print("Altura máxima alcanzada. No se puede subir más.")
+            ud_vel = 0
+            drone.send_rc_control(0, 0, 0, 0)
+            drone.land()
+
+        # if key == ord('p'):
+        #     clean_exit()
+        #     break
+
+
+        
+
+
+        # if key == ord('t'):
+        #     if flying:
+        #         pass
+        #     else:
+        #         if drone.get_battery() <= 15 and not flying:
+        #             pass
+        #         else:
+        #             drone.takeoff()
+        #             flying = True
+        
+        # if key == ord('l'):
+        #     if flying:
+        #         drone.land()
+        #         flying = False
+        #     else:
+        #         pass
+        
+        # if flying:
+        #     if key == ord('w'):
+        #         fb_vel = 100
+        #     elif key == ord('s'):
+        #         fb_vel = -100
+        #     elif key == ord('a'):
+        #         lr_vel = -100
+        #     elif key == ord('d'):
+        #         lr_vel = 100
+        #     elif key == ord('r'):
+        #         if drone.get_height() > 300:
+        #             cv2.putText(frame, "Height Exceeded", (10, 120), 
+        #                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        #             ud_vel = 0
+        #         else:
+        #             ud_vel = 60
+        #     elif key == ord('f'):
+        #         ud_vel = -60
+        #     elif key == ord('q'):
+        #         yaw_vel = 100
+        #     elif key == ord('e'):
+        #         yaw_vel = -100
+
             
 
         drone.send_rc_control(lr_vel, fb_vel, ud_vel, yaw_vel)
