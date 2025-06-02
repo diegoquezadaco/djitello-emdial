@@ -109,7 +109,7 @@ def control():
             drone.land()
             flying = False
 
-        if mode:
+        if not mode:
             cv2.putText(frame, "Modo Manual", (10, 120), 
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         else:
@@ -117,6 +117,8 @@ def control():
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
             cv2.putText(frame, label, (10, 150), 
                             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+            
         
         cv2.imshow('Video Stream', frame)
         key = cv2.waitKey(50) & 0xFF
