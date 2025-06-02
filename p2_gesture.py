@@ -10,6 +10,11 @@ hands = mp_hands.Hands(static_image_mode=False, max_num_hands=1, min_detection_c
 
 global hand_landmarks
 
+# Función callback para el trackbar de altura máxima
+def set_max_height(value):
+    global max_height
+    max_height = value
+
 # Crear trackbars para velocidades en x, y, z y yaw
 cv2.createTrackbar('Velocidad X', 'Configuración de Vuelo', 0, 100, lambda x: None)
 cv2.createTrackbar('Velocidad Y', 'Configuración de Vuelo', 0, 100, lambda x: None)
