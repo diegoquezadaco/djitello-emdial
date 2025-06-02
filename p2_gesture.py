@@ -8,6 +8,8 @@ mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
 hands = mp_hands.Hands(static_image_mode=False, max_num_hands=1, min_detection_confidence=0.7)
 
+global hand_landmarks
+
 # Coordenadas
 wrist       =  0   # Muñeca
 
@@ -109,18 +111,6 @@ def control():
             drone.land()
             flying = False
 
-        if not mode:
-            cv2.putText(frame, "Modo Manual", (10, 120), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-        else:
-            cv2.putText(frame, "Modo Gestos", (10, 120), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-            cv2.putText(frame, label, (10, 150), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
-            
-        
-        cv2.imshow('Video Stream', frame)
         key = cv2.waitKey(50) & 0xFF
         
 
@@ -185,6 +175,8 @@ def control():
                 lr_vel = 0
                 ud_vel = 0
                 yaw_vel = 0
+            cv2.putText(frame, "Modo Manual", (10, 120), 
+            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
         elif flying and mode:
             if result.multi_hand_landmarks and result.multi_handedness:
@@ -238,12 +230,12 @@ def control():
                 elif landmarks[thumb_tip].y < landmarks[thumb_mcp].y and landmarks[index_tip].y < landmarks[index_mcp].y and landmarks[thumb_tip].x < landmarks[pinky_mcp].x and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y > landmarks[pinky_mcp].y:
                     label = "Right"
                     if flying:
-                        lr_vel = 50
+                        lr_vel = -50
                     
                 elif landmarks[thumb_tip].y < landmarks[thumb_mcp].y and landmarks[index_tip].y < landmarks[index_mcp].y and landmarks[thumb_tip].x > landmarks[pinky_mcp].x and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y > landmarks[pinky_mcp].y:
                     label = "Left"
                     if flying:
-                        lr_vel = -50
+                        lr_vel = 50
                     
                 elif landmarks[thumb_tip].y < landmarks[thumb_mcp].y and landmarks[index_tip].y < landmarks[index_mcp].y and landmarks[thumb_tip].x < landmarks[pinky_mcp].x and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y < landmarks[pinky_mcp].y:
                     label = "Front"
@@ -290,6 +282,11 @@ def control():
                     yaw_vel = 0
                 
                 print(f"Detected command: {label}")
+                cv2.putText(frame, "Modo Gestos", (10, 120), 
+                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                cv2.putText(frame, label, (10, 150), 
+                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
             
             
 
@@ -298,8 +295,11 @@ def control():
                 ud_vel = 0
                 drone.send_rc_control(0, 0, 0, 0)
                 drone.land()
+        
 
         drone.send_rc_control(lr_vel, fb_vel, ud_vel, yaw_vel)
+                            
+        cv2.imshow('Video Stream', frame)
 
 
 
