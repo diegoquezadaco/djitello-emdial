@@ -10,6 +10,24 @@ hands = mp_hands.Hands(static_image_mode=False, max_num_hands=1, min_detection_c
 
 global hand_landmarks
 
+# Crear trackbars para velocidades en x, y, z y yaw
+cv2.createTrackbar('Velocidad X', 'Configuración de Vuelo', 0, 100, lambda x: None)
+cv2.createTrackbar('Velocidad Y', 'Configuración de Vuelo', 0, 100, lambda x: None)
+cv2.createTrackbar('Velocidad Z', 'Configuración de Vuelo', 0, 100, lambda x: None)
+cv2.createTrackbar('Velocidad Yaw', 'Configuración de Vuelo', 0, 100, lambda x: None)
+
+# Crear trackbar para la altura máxima
+cv2.createTrackbar('Altura Máxima', 'Configuración de Vuelo', 0, 500, set_max_height)
+
+# Función para obtener los valores de los trackbars
+def get_trackbar_values():
+    vx = cv2.getTrackbarPos('Velocidad X', 'Configuración de Vuelo')
+    vy = cv2.getTrackbarPos('Velocidad Y', 'Configuración de Vuelo')
+    vz = cv2.getTrackbarPos('Velocidad Z', 'Configuración de Vuelo')
+    yaw = cv2.getTrackbarPos('Velocidad Yaw', 'Configuración de Vuelo')
+    height = cv2.getTrackbarPos('Altura Máxima', 'Configuración de Vuelo')
+    return vx, vy, vz, yaw, height
+
 # Coordenadas
 wrist       =  0   # Muñeca
 
@@ -74,6 +92,7 @@ def control():
 
 
     while True:
+
         
         frame = drone.get_frame_read().frame
         if frame is None:
@@ -86,6 +105,7 @@ def control():
         h, w, _ = frame.shape
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
+        vx, vy, vz, yaw, max_height = get_trackbar_values()
         result = hands.process(rgb)
         label = "No se detecta mano"
 
@@ -149,27 +169,28 @@ def control():
             
         
         if flying and not mode:
+            #vx, vy, vz, yaw, max_height = get_trackbar_values()
             if key == ord('w'):
-                fb_vel = 100
+                fb_vel = vx
             elif key == ord('s'):
-                fb_vel = -100
+                fb_vel = -vx
             elif key == ord('a'):
-                lr_vel = -100
+                lr_vel = -vy
             elif key == ord('d'):
-                lr_vel = 100
+                lr_vel = vy
             elif key == ord('r'):
-                if drone.get_height() > 300:
+                if drone.get_height() > max_height:
                     cv2.putText(frame, "Height Exceeded", (10, 120), 
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
                     ud_vel = 0
                 else:
-                    ud_vel = 60
+                    ud_vel = vz
             elif key == ord('f'):
-                ud_vel = -60
+                ud_vel = -vz
             elif key == ord('q'):
-                yaw_vel = 100
+                yaw_vel = yaw
             elif key == ord('e'):
-                yaw_vel = -100
+                yaw_vel = -yaw
             else:
                 fb_vel = 0
                 lr_vel = 0
@@ -213,7 +234,7 @@ def control():
                 elif landmarks[pinky_tip].y < landmarks[pinky_mcp].y and landmarks[thumb_tip].x > landmarks[thumb_mcp].x and landmarks[index_tip].y > landmarks[index_mcp].y and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y:
                     label = "Up"
                     if flying:
-                        ud_vel = 30
+                        ud_vel = vz
                     
                 elif landmarks[pinky_tip].y > landmarks[pinky_dip].y and \
                         landmarks[pinky_dip].y > landmarks[pinky_pip].y and \
@@ -225,27 +246,27 @@ def control():
                         landmarks[ring_tip].y > landmarks[wrist].y:
                     label = "Down"
                     if flying:
-                        ud_vel = -30
-                    
+                        ud_vel = -vz
+
                 elif landmarks[thumb_tip].y < landmarks[thumb_mcp].y and landmarks[index_tip].y < landmarks[index_mcp].y and landmarks[thumb_tip].x < landmarks[pinky_mcp].x and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y > landmarks[pinky_mcp].y:
                     label = "Right"
                     if flying:
-                        lr_vel = -50
-                    
+                        lr_vel = -vy
+
                 elif landmarks[thumb_tip].y < landmarks[thumb_mcp].y and landmarks[index_tip].y < landmarks[index_mcp].y and landmarks[thumb_tip].x > landmarks[pinky_mcp].x and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y > landmarks[pinky_mcp].y:
                     label = "Left"
                     if flying:
-                        lr_vel = 50
+                        lr_vel = vy
                     
                 elif landmarks[thumb_tip].y < landmarks[thumb_mcp].y and landmarks[index_tip].y < landmarks[index_mcp].y and landmarks[thumb_tip].x < landmarks[pinky_mcp].x and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y < landmarks[pinky_mcp].y:
                     label = "Front"
                     if flying:
-                        fb_vel = 50
+                        fb_vel = vx
                     
                 elif landmarks[thumb_tip].y < landmarks[thumb_mcp].y and landmarks[index_tip].y < landmarks[index_mcp].y and landmarks[thumb_tip].x > landmarks[pinky_mcp].x and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y < landmarks[pinky_mcp].y:
                     label = "Back"
                     if flying:
-                        fb_vel = -50
+                        fb_vel = -vx
                     
                 elif landmarks[thumb_tip].y < landmarks[thumb_ip].y and \
                         landmarks[thumb_ip].y < landmarks[thumb_mcp].y and \
@@ -257,7 +278,7 @@ def control():
                         landmarks[pinky_pip].x < landmarks[pinky_mcp].x:
                     label = "Chill"
                     if flying:
-                        yaw_vel = 60
+                        yaw_vel = yaw
             
                 elif landmarks[thumb_tip].y < landmarks[thumb_ip].y and \
                         landmarks[thumb_ip].y < landmarks[thumb_mcp].y and \
@@ -269,7 +290,7 @@ def control():
                         landmarks[pinky_pip].x > landmarks[pinky_mcp].x:
                     label = "Chill Pal otro lado"
                     if flying:
-                        yaw_vel = -60
+                        yaw_vel = -yaw
                     
                     #label = (f'Distance: {distance:.4} - Index pointing up')
 
@@ -290,7 +311,7 @@ def control():
             
             
 
-            if drone.get_height() > 300 and ud_vel > 0:
+            if drone.get_height() > max_height and ud_vel > 0:
                 print("Altura máxima alcanzada. No se puede subir más.")
                 ud_vel = 0
                 drone.send_rc_control(0, 0, 0, 0)
