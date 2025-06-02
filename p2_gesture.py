@@ -10,6 +10,8 @@ hands = mp_hands.Hands(static_image_mode=False, max_num_hands=1, min_detection_c
 
 global hand_landmarks
 
+cv2.namedWindow('Configuración de Vuelo')
+
 # Función callback para el trackbar de altura máxima
 def set_max_height(value):
     global max_height
@@ -171,6 +173,44 @@ def control():
                 pass
         if key == ord('m'):
             mode = not mode
+        
+        if mode:
+            if result.multi_hand_landmarks and result.multi_handedness:
+                    hand_landmarks = result.multi_hand_landmarks[0]
+                    handedness = result.multi_handedness[0]
+
+                    landmarks = hand_landmarks.landmark
+                    if landmarks[middle_tip].y < landmarks[middle_mcp].y and \
+                            landmarks[ring_tip].y < landmarks[ring_mcp].y and \
+                            landmarks[pinky_tip].y < landmarks[pinky_mcp].y and \
+                            landmarks[thumb_tip].y < landmarks[thumb_mcp].y and \
+                            landmarks[index_tip].y < landmarks[index_mcp].y:
+                        label = "Takeoff"
+                
+                        if flying:
+                            pass
+                        else:
+                            if drone.get_battery() <= 15 and not flying:
+                                pass
+                            else:
+                                drone.takeoff()
+                                flying = True
+                    elif landmarks[middle_tip].y < landmarks[middle_dip].y and \
+                            landmarks[middle_dip].y < landmarks[middle_pip].y and \
+                            landmarks[middle_pip].y < landmarks[middle_mcp].y and \
+                            landmarks[index_tip].y < landmarks[index_dip].y and \
+                            landmarks[index_dip].y < landmarks[index_pip].y and \
+                            landmarks[index_pip].y < landmarks[index_mcp].y and \
+                            landmarks[ring_tip].y > landmarks[ring_mcp].y and \
+                            landmarks[pinky_tip].y > landmarks[pinky_mcp].y and \
+                            landmarks[ring_tip].y > landmarks[ring_mcp].y and \
+                            landmarks[ring_tip].y < landmarks[wrist].y:
+                        label = "Land"
+                        if flying:
+                            drone.land()
+                            flying = False
+                        else:
+                            pass
             
         
         if flying and not mode:
@@ -225,11 +265,16 @@ def control():
                         else:
                             drone.takeoff()
                             flying = True
-                elif landmarks[middle_tip].y > landmarks[middle_mcp].y and \
+                elif landmarks[middle_tip].y < landmarks[middle_dip].y and \
+                        landmarks[middle_dip].y < landmarks[middle_pip].y and \
+                        landmarks[middle_pip].y < landmarks[middle_mcp].y and \
+                        landmarks[index_tip].y < landmarks[index_dip].y and \
+                        landmarks[index_dip].y < landmarks[index_pip].y and \
+                        landmarks[index_pip].y < landmarks[index_mcp].y and \
                         landmarks[ring_tip].y > landmarks[ring_mcp].y and \
                         landmarks[pinky_tip].y > landmarks[pinky_mcp].y and \
-                        landmarks[index_tip].y > landmarks[index_mcp].y and \
-                        landmarks[index_tip].y < landmarks[wrist].y:
+                        landmarks[ring_tip].y > landmarks[ring_mcp].y and \
+                        landmarks[ring_tip].y < landmarks[wrist].y:
                     label = "Land"
                     if flying:
                         drone.land()
