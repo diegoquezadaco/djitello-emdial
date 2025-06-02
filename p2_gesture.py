@@ -1,14 +1,14 @@
 from djitellopy import Tello
-import time
 import cv2
-import numpy as np
+import time
 import mediapipe as mp
 
-
+# Inicializar MediaPipe Hands
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
 hands = mp_hands.Hands(static_image_mode=False, max_num_hands=1, min_detection_confidence=0.7)
 
+# Coordenadas
 wrist       =  0   # Muñeca
 
 thumb_cmc   =  1   # Articulación base del pulgar (carpometacarpiana)
@@ -34,195 +34,126 @@ ring_tip    = 16   # Punta del dedo anular
 pinky_mcp   = 17   # Nudillo del dedo meñique
 pinky_pip   = 18   # Primera articulación del dedo meñique
 pinky_dip   = 19   # Segunda articulación del dedo meñique
-pinky_tip   = 20 
+pinky_tip   = 20   # Punta del dedo meñique
 
-# --- CONFIG ---
-WIDTH, HEIGHT = 650, 500
-AREA_MIN     = 0.005 * (WIDTH * HEIGHT)  # minimum area to consider “in frame”
-DESIRED_AREA = AREA_MIN                 # target area
-
-THRESHOLD_X  = int(0.15 * WIDTH)        # dead-zone half-width
-THRESHOLD_Y  = int(0.15 * HEIGHT)       # dead-zone half-height
-
-# Proportional gains for yaw (deg/s), vertical (cm/s), forward/back (cm/s)
-Kp_yaw = 0.4
-Kp_v   = 0.4
-Kp_fb  = 0.0002
-
-MAX_YAW = 100
-MAX_V   = 100
-MAX_FB  = 100
-
-# HSV trackbar initial values for green
-H_MIN, H_MAX = 40, 110
-S_MIN, S_MAX = 55, 192
-V_MIN, V_MAX = 30, 214
-
-def nothing(x):
-    pass
-
-# --- SETUP ---
+# Conectar al dron
 drone = Tello()
 drone.connect()
-print(f"Battery: {drone.get_battery()}%")
+
+#iniciar stream de video
 drone.streamon()
-time.sleep(2)
+time.sleep(3)
 
-# Trackbars for HSV tuning
-cv2.namedWindow('Trackbars')
-cv2.resizeWindow('Trackbars', 600, 400)
-cv2.createTrackbar('H Min','Trackbars',H_MIN,179,nothing)
-cv2.createTrackbar('H Max','Trackbars',H_MAX,179,nothing)
-cv2.createTrackbar('S Min','Trackbars',S_MIN,255,nothing)
-cv2.createTrackbar('S Max','Trackbars',S_MAX,255,nothing)
-cv2.createTrackbar('V Min','Trackbars',V_MIN,255,nothing)
-cv2.createTrackbar('V Max','Trackbars',V_MAX,255,nothing)
+global flying
+global mode
 
-drone.takeoff()
-flying = True
-mode = False  # manual control mode, true is manual mode.
+def clean_exit():
+    
+    print("\nCerrando el programa...")
+    if flying:
+        drone.send_rc_control(0, 0, 0, 0)
+        time.sleep(1)
+        drone.land()
+    cv2.destroyAllWindows()
+    drone.streamoff()
+    drone.end()
+    print("Programa cerrado correctamente.")
 
-try:
+
+def control():
+    
+    flying = False
+    mode = True  # Modo de control manual
+
+    fb_vel = 0
+    lr_vel = 0
+    ud_vel = 0
+    yaw_vel = 0
+
+
     while True:
+        
         frame = drone.get_frame_read().frame
         if frame is None:
+            print('No se recibio el cuadro')
             continue
 
-        # resize and do the original two-step conversion (BGR→RGB, then BGR→HSV)
-        frame = cv2.resize(frame, (WIDTH, HEIGHT))
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        hsv   = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-        blurred = cv2.GaussianBlur(hsv, (15,15), 0)
+        # Flip para espejo
+        frame = cv2.flip(frame, 1)
+        h, w, _ = frame.shape
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-        # read trackbar positions
-        h_min = cv2.getTrackbarPos('H Min','Trackbars')
-        h_max = cv2.getTrackbarPos('H Max','Trackbars')
-        s_min = cv2.getTrackbarPos('S Min','Trackbars')
-        s_max = cv2.getTrackbarPos('S Max','Trackbars')
-        v_min = cv2.getTrackbarPos('V Min','Trackbars')
-        v_max = cv2.getTrackbarPos('V Max','Trackbars')
-        lower = np.array([h_min, s_min, v_min])
-        upper = np.array([h_max, s_max, v_max])
+        result = hands.process(rgb)
+        label = "No se detecta mano"
 
-        # mask and morphological clean-up
-        mask = cv2.inRange(blurred, lower, upper)
-        mask = cv2.erode(mask, None, iterations=2)
-        mask = cv2.dilate(mask, None, iterations=2)
-
-        # find largest contour
-        contours, _ = cv2.findContours(mask,
-                                       cv2.RETR_EXTERNAL,
-                                       cv2.CHAIN_APPROX_SIMPLE)
-        if contours:
-            c    = max(contours, key=cv2.contourArea)
-            area = cv2.contourArea(c)
+        cv2.putText(frame, "Battery: {}%".format(drone.get_battery()), 
+                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        cv2.putText(frame, "Height: {}cm".format(drone.get_height()), 
+                    (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        if flying:
+            cv2.putText(frame, "Flying", (10, 90), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         else:
-            area = 0
-
-        # default velocities
-        lr_vel  = 0   # left/right unused
-        fb_vel  = 0   # forward/back
-        ud_vel  = 0   # up/down
-        yaw_vel = 0   # rotation
-
-        if area > AREA_MIN:
-            x, y, w, h = cv2.boundingRect(c)
-            cx, cy = x + w//2, y + h//2
-
-            # draw bounding box + center dot
-            cv2.rectangle(frame, (x,y), (x+w,y+h), (0,255,0), 2)
-            cv2.circle(frame, (cx,cy), 5, (0,0,255), -1)
-
-            # compute errors
-            err_x    = cx - WIDTH//2
-            err_y    = HEIGHT//2 - cy
-            err_area = DESIRED_AREA - (w*h)
-
-            # YAW: flipped sign so +err_x → rotate right
-            if abs(err_x) > THRESHOLD_X:
-                yaw_vel = int(np.clip( Kp_yaw * err_x, -MAX_YAW, MAX_YAW))
-            # VERTICAL
-            if abs(err_y) > THRESHOLD_Y:
-                ud_vel = int(np.clip( Kp_v  * err_y, -MAX_V,   MAX_V  ))
-            # FORWARD/BACK
-            fb_vel = int(np.clip( Kp_fb * err_area, -MAX_FB, MAX_FB))
-
-            # annotate on frame
-            if yaw_vel < 0:
-                cv2.putText(frame, 'Rotate →', (10,30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,0,0), 2)
-            elif yaw_vel > 0:
-                cv2.putText(frame, 'Rotate ←', (10,30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,0,0), 2)
-
-            if ud_vel > 0:
-                cv2.putText(frame, 'Up', (10,60),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,0,0), 2)
-            elif ud_vel < 0:
-                cv2.putText(frame, 'Down', (10,60),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,0,0), 2)
-
-            if fb_vel > 0:
-                cv2.putText(frame, 'Forward', (10,90),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,0,0), 2)
-            elif fb_vel < 0:
-                cv2.putText(frame, 'Backward', (10,90),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,0,0), 2)
-
-        # draw dead-zone rectangle
-        cv2.rectangle(frame,
-                      (WIDTH//2-THRESHOLD_X, HEIGHT//2-THRESHOLD_Y),
-                      (WIDTH//2+THRESHOLD_X, HEIGHT//2+THRESHOLD_Y),
-                      (0,0,255), 2)
-
-        # guide lines
-        cv2.line(frame,
-                 (WIDTH//2-THRESHOLD_X, 0),
-                 (WIDTH//2-THRESHOLD_X, HEIGHT),
-                 (255,0,0), 2)
-        cv2.line(frame,
-                 (WIDTH//2+THRESHOLD_X, 0),
-                 (WIDTH//2+THRESHOLD_X, HEIGHT),
-                 (255,0,0), 2)
-        cv2.line(frame,
-                 (0, HEIGHT//2-THRESHOLD_Y),
-                 (WIDTH, HEIGHT//2-THRESHOLD_Y),
-                 (255,0,0), 2)
-        cv2.line(frame,
-                 (0, HEIGHT//2+THRESHOLD_Y),
-                 (WIDTH, HEIGHT//2+THRESHOLD_Y),
-                 (255,0,0), 2)
-
-        # battery status
-        bat = drone.get_battery()
-        cv2.putText(frame, f"Battery: {bat}%", (10, HEIGHT-10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,255,0), 2)
-
-
-        # display windows
-        cv2.imshow('Tello', frame)
-        cv2.imshow('Mask', mask)
-
-        key = cv2.waitKey(1) & 0xFF
-        if key == ord('q'):
-            break
-        elif key == ord('l') and flying:
+            cv2.putText(frame, "Landed", (10, 90), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            
+        if drone.get_battery() <= 15 and not flying:
+            cv2.putText(frame, "Bateria baja. No se puede despegar.", (10, 150), 
+                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            
+            
+        if drone.get_battery() <= 10 and flying:
+            cv2.putText(frame, "Bateria crítica. Aterrizando automaticamente.", (10, 180), 
+                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
             drone.land()
             flying = False
-        elif key == ord('t') and not flying and bat > 15:
-            drone.takeoff()
-            flying = True
-        elif key == ord('m'):
+            
+        
+        cv2.imshow('Video Stream', frame)
+        key = cv2.waitKey(50) & 0xFF
+        
+
+        '''if drone.get_height() > 300 and ud_vel > 0:
+            print("Altura máxima alcanzada. No se puede subir más.")
+            ud_vel = 0
+            drone.send_rc_control(0, 0, 0, 0)
+            drone.land()'''
+
+        if key == ord('p'):
+            clean_exit()
+            break
+
+
+        
+
+
+        if key == ord('t'):
+            if flying:
+                pass
+            else:
+                if drone.get_battery() <= 15 and not flying:
+                    pass
+                else:
+                    drone.takeoff()
+                    flying = True
+        
+        if key == ord('l'):
+            if flying:
+                drone.land()
+                flying = False
+            else:
+                pass
+        if key == ord('m'):
             mode = not mode
             if mode:
-                cv2.putText(frame, "Manual Control", (10, 150), 
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                cv2.putText(frame, "Modo Manual", (10, 120), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             else:
-                cv2.putText(frame, "Auto Control", (10, 150), 
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-
-        # manual control
-        if flying and mode:
+                cv2.putText(frame, "Modo Gestos", (10, 120), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        
+        if flying and not mode:
             if key == ord('w'):
                 fb_vel = 100
             elif key == ord('s'):
@@ -249,11 +180,117 @@ try:
                 lr_vel = 0
                 ud_vel = 0
                 yaw_vel = 0
+
+        elif flying and mode:
+            if result.multi_hand_landmarks and result.multi_handedness:
+                hand_landmarks = result.multi_hand_landmarks[0]
+                handedness = result.multi_handedness[0]
+
+                landmarks = hand_landmarks.landmark
+                if landmarks[middle_tip].y < landmarks[middle_mcp].y and landmarks[ring_tip].y < landmarks[ring_mcp].y and landmarks[pinky_tip].y < landmarks[pinky_mcp].y and landmarks[thumb_tip].y < landmarks[thumb_mcp].y and landmarks[index_tip].y < landmarks[index_mcp].y:
+                    label = "Takeoff"
             
+                    if flying:
+                        pass
+                    else:
+                        if drone.get_battery() <= 15 and not flying:
+                            pass
+                        else:
+                            drone.takeoff()
+                            flying = True
+                elif landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y > landmarks[pinky_mcp].y and landmarks[index_tip].y > landmarks[index_mcp].y:
+                    label = "Land"
+                    if flying:
+                        drone.land()
+                        flying = False
+                    else:
+                        pass
+                elif landmarks[pinky_tip].y < landmarks[pinky_mcp].y and landmarks[thumb_tip].x > landmarks[thumb_mcp].x and landmarks[index_tip].y > landmarks[index_mcp].y and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y:
+                    label = "Up"
+                    if flying:
+                        ud_vel = 30
+                    
+                elif landmarks[pinky_tip].y > landmarks[pinky_mcp].y and landmarks[thumb_tip].y > landmarks[thumb_mcp].y and landmarks[index_tip].y > landmarks[wrist].y and landmarks[middle_tip].y > landmarks[wrist].y and landmarks[ring_tip].y > landmarks[wrist].y:
+                    label = "Down"
+                    if flying:
+                        ud_vel = -30
+                    
+                elif landmarks[thumb_tip].y < landmarks[thumb_mcp].y and landmarks[index_tip].y < landmarks[index_mcp].y and landmarks[thumb_tip].x < landmarks[pinky_mcp].x and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y > landmarks[pinky_mcp].y:
+                    label = "Right"
+                    if flying:
+                        lr_vel = 50
+                    
+                elif landmarks[thumb_tip].y < landmarks[thumb_mcp].y and landmarks[index_tip].y < landmarks[index_mcp].y and landmarks[thumb_tip].x > landmarks[pinky_mcp].x and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y > landmarks[pinky_mcp].y:
+                    label = "Left"
+                    if flying:
+                        lr_vel = -50
+                    
+                elif landmarks[thumb_tip].y < landmarks[thumb_mcp].y and landmarks[index_tip].y < landmarks[index_mcp].y and landmarks[thumb_tip].x < landmarks[pinky_mcp].x and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y < landmarks[pinky_mcp].y:
+                    label = "Front"
+                    if flying:
+                        fb_vel = 50
+                    
+                elif landmarks[thumb_tip].y < landmarks[thumb_mcp].y and landmarks[index_tip].y < landmarks[index_mcp].y and landmarks[thumb_tip].x > landmarks[pinky_mcp].x and landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y < landmarks[pinky_mcp].y:
+                    label = "Back"
+                    if flying:
+                        fb_vel = -50
+                    
+                elif landmarks[thumb_tip].y < landmarks[thumb_ip].y and \
+                        landmarks[thumb_ip].y < landmarks[thumb_mcp].y and \
+                        landmarks[index_tip].x > landmarks[index_pip].x and \
+                        landmarks[middle_tip].x > landmarks[middle_pip].x and \
+                        landmarks[ring_tip].x > landmarks[ring_pip].x and \
+                        landmarks[pinky_tip].x < landmarks[pinky_dip].x and \
+                        landmarks[pinky_dip].x < landmarks[pinky_pip].x and \
+                        landmarks[pinky_pip].x < landmarks[pinky_mcp].x:
+                    label = "Chill"
+                    if flying:
+                        yaw_vel = 60
+            
+                elif landmarks[thumb_tip].y < landmarks[thumb_ip].y and \
+                        landmarks[thumb_ip].y < landmarks[thumb_mcp].y and \
+                        landmarks[index_tip].x < landmarks[index_pip].x and \
+                        landmarks[middle_tip].x < landmarks[middle_pip].x and \
+                        landmarks[ring_tip].x < landmarks[ring_pip].x and \
+                        landmarks[pinky_tip].x > landmarks[pinky_dip].x and \
+                        landmarks[pinky_dip].x > landmarks[pinky_pip].x and \
+                        landmarks[pinky_pip].x > landmarks[pinky_mcp].x:
+                    label = "Chill Pal otro lado"
+                    if flying:
+                        yaw_vel = -60
+                    
+                    #label = (f'Distance: {distance:.4} - Index pointing up')
+
+                    
+                else:
+                    label = "Otro gesto"
+                    fb_vel = 0
+                    lr_vel = 0
+                    ud_vel = 0
+                    yaw_vel = 0
+                
+                print(f"Detected command: {label}")
+                cv2.putText(frame, label, (10, 150), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+            
+
+            if drone.get_height() > 300 and ud_vel > 0:
+                print("Altura máxima alcanzada. No se puede subir más.")
+                ud_vel = 0
+                drone.send_rc_control(0, 0, 0, 0)
+                drone.land()
+
         drone.send_rc_control(lr_vel, fb_vel, ud_vel, yaw_vel)
 
-finally:
-    if flying:
-        drone.land()
-    drone.streamoff()
-    cv2.destroyAllWindows()
+
+
+
+def main():
+    try:
+        control()
+    except KeyboardInterrupt:
+        clean_exit()
+
+if __name__ == '__main__':
+    main()
