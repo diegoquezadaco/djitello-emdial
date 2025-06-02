@@ -108,7 +108,15 @@ def control():
                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
             drone.land()
             flying = False
-            
+
+        if mode:
+            cv2.putText(frame, "Modo Manual", (10, 120), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        else:
+            cv2.putText(frame, "Modo Gestos", (10, 120), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            cv2.putText(frame, label, (10, 150), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         
         cv2.imshow('Video Stream', frame)
         key = cv2.waitKey(50) & 0xFF
@@ -146,12 +154,7 @@ def control():
                 pass
         if key == ord('m'):
             mode = not mode
-            if mode:
-                cv2.putText(frame, "Modo Manual", (10, 120), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            else:
-                cv2.putText(frame, "Modo Gestos", (10, 120), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            
         
         if flying and not mode:
             if key == ord('w'):
@@ -187,7 +190,11 @@ def control():
                 handedness = result.multi_handedness[0]
 
                 landmarks = hand_landmarks.landmark
-                if landmarks[middle_tip].y < landmarks[middle_mcp].y and landmarks[ring_tip].y < landmarks[ring_mcp].y and landmarks[pinky_tip].y < landmarks[pinky_mcp].y and landmarks[thumb_tip].y < landmarks[thumb_mcp].y and landmarks[index_tip].y < landmarks[index_mcp].y:
+                if landmarks[middle_tip].y < landmarks[middle_mcp].y and \
+                        landmarks[ring_tip].y < landmarks[ring_mcp].y and \
+                        landmarks[pinky_tip].y < landmarks[pinky_mcp].y and \
+                        landmarks[thumb_tip].y < landmarks[thumb_mcp].y and \
+                        landmarks[index_tip].y < landmarks[index_mcp].y:
                     label = "Takeoff"
             
                     if flying:
@@ -198,7 +205,11 @@ def control():
                         else:
                             drone.takeoff()
                             flying = True
-                elif landmarks[middle_tip].y > landmarks[middle_mcp].y and landmarks[ring_tip].y > landmarks[ring_mcp].y and landmarks[pinky_tip].y > landmarks[pinky_mcp].y and landmarks[index_tip].y > landmarks[index_mcp].y:
+                elif landmarks[middle_tip].y > landmarks[middle_mcp].y and \
+                        landmarks[ring_tip].y > landmarks[ring_mcp].y and \
+                        landmarks[pinky_tip].y > landmarks[pinky_mcp].y and \
+                        landmarks[index_tip].y > landmarks[index_mcp].y and \
+                        landmarks[index_tip].y < landmarks[wrist].y:
                     label = "Land"
                     if flying:
                         drone.land()
@@ -210,7 +221,14 @@ def control():
                     if flying:
                         ud_vel = 30
                     
-                elif landmarks[pinky_tip].y > landmarks[pinky_mcp].y and landmarks[thumb_tip].y > landmarks[thumb_mcp].y and landmarks[index_tip].y > landmarks[wrist].y and landmarks[middle_tip].y > landmarks[wrist].y and landmarks[ring_tip].y > landmarks[wrist].y:
+                elif landmarks[pinky_tip].y > landmarks[pinky_dip].y and \
+                        landmarks[pinky_dip].y > landmarks[pinky_pip].y and \
+                        landmarks[pinky_pip].y > landmarks[pinky_mcp].y and \
+                        landmarks[thumb_tip].y > landmarks[thumb_mcp].y and \
+                        landmarks[index_tip].y > landmarks[index_mcp].y and \
+                        landmarks[index_pip].y > landmarks[index_tip].y and \
+                        landmarks[middle_tip].y > landmarks[wrist].y and \
+                        landmarks[ring_tip].y > landmarks[wrist].y:
                     label = "Down"
                     if flying:
                         ud_vel = -30
@@ -270,9 +288,7 @@ def control():
                     yaw_vel = 0
                 
                 print(f"Detected command: {label}")
-                cv2.putText(frame, label, (10, 150), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-
+            
             
 
             if drone.get_height() > 300 and ud_vel > 0:
