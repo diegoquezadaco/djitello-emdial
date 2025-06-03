@@ -87,7 +87,7 @@ def clean_exit():
     print("Programa cerrado correctamente.")
 
 
-d# Función principal para controlar el dron
+# Función principal para controlar el dron
 def control():
     flying = False
     mode = True  # Comienza en modo de gestos
